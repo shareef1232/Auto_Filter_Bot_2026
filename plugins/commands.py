@@ -19,6 +19,7 @@ from database.ia_filterdb import Media, Media2, get_file_details, unpack_new_fil
 from database.users_chats_db import db
 from info import *
 from utils import get_settings, save_group_settings, is_subscribed, is_req_subscribed, get_size, get_shortlink, is_check_admin, temp, get_readable_time, get_time, generate_settings_text, log_error, clean_filename
+import time
 
 
 
@@ -98,7 +99,7 @@ async def start(client, message):
         await client.send_message(LOG_CHANNEL, script.LOG_TEXT_P.format(message.from_user.id, message.from_user.mention))
     if len(message.command) != 2:
         buttons = [[
-                    InlineKeyboardButton('🔰 ᴀᴅᴅ ᴍᴇ ᴛᴏ ʏᴏᴜʀ ɢʀᴏᴜᴘ 🔰', url=f'http://telegram.me/{temp.U_NAME}?startgroup=true')
+                    InlineKeyboardButton('🔰 ᴀᴅᴅ ᴍᴇ ᴛᴏ ʏᴏᴜʀ ɢʀᴏᴜᴘ 🔰', url=f'http://t.me/{temp.U_NAME}?startgroup=true')
                 ],[
                     InlineKeyboardButton(' ʜᴇʟᴘ 📢', callback_data='help'),
                     InlineKeyboardButton(' ᴀʙᴏᴜᴛ 📖', callback_data='about')
@@ -130,7 +131,7 @@ async def start(client, message):
 
     if len(message.command) == 2 and message.command[1] in ["subscribe", "error", "okay", "help"]:
         buttons = [[
-                    InlineKeyboardButton('🔰 ᴀᴅᴅ ᴍᴇ ᴛᴏ ʏᴏᴜʀ ɢʀᴏᴜᴘ 🔰', url=f'http://telegram.me/{temp.U_NAME}?startgroup=true')
+                    InlineKeyboardButton('🔰 ᴀᴅᴅ ᴍᴇ ᴛᴏ ʏᴏᴜʀ ɢʀᴏᴜᴘ 🔰', url=f'http://t.me/{temp.U_NAME}?startgroup=true')
                 ],[
                     InlineKeyboardButton(' ʜᴇʟᴘ 📢', callback_data='help'),
                     InlineKeyboardButton(' ᴀʙᴏᴜᴛ 📖', callback_data='about')
@@ -230,6 +231,9 @@ async def start(client, message):
     except:
         _, grp_id, file_id = "", 0, data
 
+    # Fetch file details concurrently with user checks
+    file_details_task = asyncio.create_task(get_file_details(file_id))
+
     if not await db.has_premium_access(message.from_user.id): 
         try:
             btn = []
@@ -311,6 +315,9 @@ async def start(client, message):
             print(f"Error In Verification - {e}")
             pass
 
+    # Now, await the file details task
+    files_ = await file_details_task
+
     if data.startswith("allfiles"):
         try:
             files = temp.GETALL.get(file_id)
@@ -365,7 +372,7 @@ async def start(client, message):
                     reply_markup=InlineKeyboardMarkup(btn)
                 )
                 filesarr.append(msg)
-            k = await client.send_message(chat_id=message.from_user.id, text=f"<b><u>❗️❗️❗️IMPORTANT❗️️❗️❗️</u></b>\n\nᴛʜɪꜱ ᴍᴏᴠɪᴇ ꜰɪʟᴇ/ᴠɪᴅᴇᴏ ᴡɪʟʟ ʙᴇ ᴅᴇʟᴇᴛᴇᴅ ɪɴ <b><u><code>{get_time(DELETE_TIME)}</code></u> 🫥 <i></b>(ᴅᴜᴇ ᴛᴏ ᴄᴏᴘʏʀɪɢʜᴛ ɪꜱꜱᴜᴇꜱ)</i>.\n\n<b><i>ᴘʟᴇᴀꜱᴇ ꜰᴏʀᴡᴀʀᴅ ᴛʜɪꜱ ꜰɪʟᴇ ᴛᴏ ꜱᴏᴍᴇᴡʜᴇʀᴇ ᴇʟꜱᴇ ᴀɴᴅ ꜱᴛᴀʀᴛ ᴅᴏᴡɴʟᴏᴀᴅɪɴɢ ᴛʜᴇʀᴇ</i></b>")
+            k = await client.send_message(chat_id=message.from_user.id, text=script.DEL_MSG.format(get_time(DELETE_TIME)), parse_mode=enums.ParseMode.HTML)
             await asyncio.sleep(DELETE_TIME)
             for x in filesarr:
                 await x.delete()
@@ -376,7 +383,6 @@ async def start(client, message):
             return
 
     user = message.from_user.id
-    files_ = await get_file_details(file_id)
     settings = await get_settings(int(grp_id))
     if not files_:
         pre, file_id = ((base64.urlsafe_b64decode(data + "=" * (-len(data) % 4))).decode("ascii")).split("_", 1)
@@ -422,12 +428,8 @@ async def start(client, message):
                 f_caption,
                 reply_markup=InlineKeyboardMarkup(btn)
             )
-            k = await msg.reply(
-                f"<b><u>❗️❗️❗️IMPORTANT❗️️❗️❗️</u></b>\n\n"
-                f"ᴛʜɪꜱ ᴍᴏᴠɪᴇ ꜰɪʟᴇ/ᴠɪᴅᴇᴏ ᴡɪʟʟ ʙᴇ ᴅᴇʟᴇᴛᴇᴅ ɪɴ <b><u><code>{get_time(DELETE_TIME)}</code></u> 🫥 <i></b>"
-                "(ᴅᴜᴇ ᴛᴏ ᴄᴏᴘʏʀɪɢʜᴛ ɪꜱꜱᴜᴇꜱ)</i>.\n\n"
-                "<b><i>ᴘʟᴇᴀꜱᴇ ꜰᴏʀᴡᴀʀᴅ ᴛʜɪꜱ ꜰɪʟᴇ ᴛᴏ ꜱᴏᴍᴇᴡʜᴇʀᴇ ᴇʟꜱᴇ ᴀɴᴅ ꜱᴛᴀʀᴛ ᴅᴏᴡɴʟᴏᴀᴅɪɴɢ ᴛʜᴇʀᴇ</i></b>",
-                quote=True
+            k = await msg.reply(script.DEL_MSG.format(get_time(DELETE_TIME)),
+                quote=True, parse_mode=enums.ParseMode.HTML
             )
             await asyncio.sleep(DELETE_TIME)
             await msg.delete()
@@ -479,12 +481,8 @@ async def start(client, message):
         protect_content=settings.get('file_secure', PROTECT_CONTENT),
         reply_markup=InlineKeyboardMarkup(btn)
     )
-    k = await msg.reply(
-        f"<b><u>❗️❗️❗️IMPORTANT❗️️❗️❗️</u></b>\n\n"
-        f"ᴛʜɪꜱ ᴍᴏᴠɪᴇ ꜰɪʟᴇ/ᴠɪᴅᴇᴏ ᴡɪʟʟ ʙᴇ ᴅᴇʟᴇᴛᴇᴅ ɪɴ <b><u><code>{get_time(DELETE_TIME)}</code></u> 🫥 <i></b>"
-        "(ᴅᴜᴇ ᴛᴏ ᴄᴏᴘʏʀɪɢʜᴛ ɪꜱꜱᴜᴇꜱ)</i>.\n\n"
-        "<b><i>ᴘʟᴇᴀꜱᴇ ꜰᴏʀᴡᴀʀᴅ ᴛʜɪꜱ ꜰɪʟᴇ ᴛᴏ ꜱᴏᴍᴇᴡʜᴇʀᴇ ᴇʟꜱᴇ ᴀɴᴅ ꜱᴛᴀʀᴛ ᴅᴏᴡɴʟᴏᴀᴅɪɴɢ ᴛʜᴇʀᴇ</i></b>",
-        quote=True
+    k = await msg.reply(script.DEL_MSG.format(get_time(DELETE_TIME)),
+        quote=True, parse_mode=enums.ParseMode.HTML
     )     
     await asyncio.sleep(DELETE_TIME)
     await msg.delete()
@@ -627,7 +625,7 @@ async def settings(client, message):
                     "ᴜꜱᴇ /reload ɪɴ ᴛʜᴀᴛ ɢʀᴏᴜᴘ ᴀɴᴅ ɪᴛ ᴡɪʟʟ ᴀᴘᴘᴇᴀʀ ʜᴇʀᴇ.",
                     reply_markup=InlineKeyboardMarkup(group_list)
                 )
-        
+
 @Client.on_message(filters.command('reload'))
 async def connect_group(client, message):
     user_id = message.from_user.id
@@ -648,17 +646,17 @@ async def connect_group(client, message):
             await message.reply_text(f"Lɪɴᴋᴇᴅ sᴜᴄᴄᴇssғᴜʟʟʏ ✅ {chat.title} ᴛᴏ PM.")
         except:
             await message.reply_text("Invalid group ID or error occurred.")
-            
+
 @Client.on_message(filters.command('set_template'))
 async def save_template(client, message):
     sts = await message.reply("ᴄʜᴇᴄᴋɪɴɢ ᴛᴇᴍᴘʟᴀᴛᴇ...")
     user_id = message.from_user.id if message.from_user else None
     if not user_id:
         return await message.reply("ʏᴏᴜ'ʀᴇ ᴀɴᴏɴʏᴍᴏᴜꜱ ᴀᴅᴍɪɴ.")
-    
+
     if message.chat.type not in [enums.ChatType.GROUP, enums.ChatType.SUPERGROUP]:
         return await sts.edit("⚠️ ᴜꜱᴇ ᴛʜɪꜱ ᴄᴏᴍᴍᴀɴᴅ ɪɴ ᴀ ɢʀᴏᴜᴘ ᴄʜᴀᴛ.")
-    
+
     group_id = message.chat.id
     title = message.chat.title
     if not await is_check_admin(client, group_id, user_id):
@@ -666,7 +664,7 @@ async def save_template(client, message):
         return
     if len(message.command) < 2:
         return await sts.edit("⚠️ ɴᴏ ᴛᴇᴍᴘʟᴀᴛᴇ ᴘʀᴏᴠɪᴅᴇᴅ!")
-    
+
     template = message.text.split(" ", 1)[1]
     await save_group_settings(group_id, 'template', template)
     await sts.edit(
@@ -674,10 +672,10 @@ async def save_template(client, message):
     )
 
 
-# Must add REQST_CHANNEL and SUPPORT_CHAT_ID to use this feature 
+# Must add REQST_CHANNEL and SUPPORT_CHAT_ID to use this feature
 @Client.on_message((filters.command(["request", "Request"]) | filters.regex("#request") | filters.regex("#Request")) & filters.group)
 async def requests(bot, message):
-    if REQST_CHANNEL is None or SUPPORT_CHAT_ID is None: return 
+    if REQST_CHANNEL is None or SUPPORT_CHAT_ID is None: return
     if message.reply_to_message and SUPPORT_CHAT_ID == message.chat.id:
         chat_id = message.chat.id
         reporter = str(message.from_user.id)
@@ -792,7 +790,7 @@ async def requests(bot, message):
                 InlineKeyboardButton('ᴠɪᴇᴡ ʀᴇǫᴜᴇꜱᴛ', url=f"{reported_post.link}")
               ]]
         await message.reply_text("<b>ʏᴏᴜʀ ʀᴇǫᴜᴇꜱᴛ ʜᴀꜱ ʙᴇᴇɴ ᴀᴅᴅᴇᴅ! ᴘʟᴇᴀꜱᴇ ᴡᴀɪᴛ ꜰᴏʀ ꜱᴏᴍᴇ ᴛɪᴍᴇ.\n\nᴊᴏɪɴ ᴄʜᴀɴɴᴇʟ ꜰɪʀꜱᴛ & ᴠɪᴇᴡ ʀᴇǫᴜᴇꜱᴛ.</b>", reply_markup=InlineKeyboardMarkup(btn))
-    
+
 @Client.on_message(filters.command("send") & filters.user(ADMINS))
 async def send_msg(bot, message):
     if message.reply_to_message:
@@ -858,8 +856,8 @@ async def deletemultiplefiles(bot, message):
 async def topsearch_callback(client, callback_query):
     def is_alphanumeric(string):
         return bool(re.match('^[a-zA-Z0-9 ]*$', string))
-    
-    limit = 20  
+
+    limit = 20
     top_messages = await mdb.get_top_messages(limit)
     seen_messages = set()
     truncated_messages = []
@@ -873,9 +871,9 @@ async def topsearch_callback(client, callback_query):
                 truncated_messages.append(msg)
     keyboard = [truncated_messages[i:i+2] for i in range(0, len(truncated_messages), 2)]
     reply_markup = ReplyKeyboardMarkup(
-        keyboard, 
-        one_time_keyboard=True, 
-        resize_keyboard=True, 
+        keyboard,
+        one_time_keyboard=True,
+        resize_keyboard=True,
         placeholder="Most searches of the day"
     )
     await callback_query.message.reply_text(
@@ -905,9 +903,9 @@ async def top(_, message):
                 truncated_messages.append(msg)
     keyboard = [truncated_messages[i:i+2] for i in range(0, len(truncated_messages), 2)]
     reply_markup = ReplyKeyboardMarkup(
-        keyboard, 
-        one_time_keyboard=True, 
-        resize_keyboard=True, 
+        keyboard,
+        one_time_keyboard=True,
+        resize_keyboard=True,
         placeholder="Most searches of the day"
     )
     await message.reply_text(
@@ -927,16 +925,16 @@ async def trendlist(client, message):
             await message.reply_text(
                 "Invalid number format.\nPlease provide a valid number after the /trendlist command."
             )
-            return 
+            return
     try:
         top_messages = await mdb.get_top_messages(limit)
     except Exception as e:
         await message.reply_text(f"Error retrieving messages: {str(e)}")
-        return  
+        return
 
     if not top_messages:
         await message.reply_text("No top messages found.")
-        return 
+        return
     seen_messages = set()
     truncated_messages = []
 
@@ -948,7 +946,7 @@ async def trendlist(client, message):
 
     if not truncated_messages:
         await message.reply_text("No valid top messages found.")
-        return  
+        return
     formatted_list = "\n".join([f"{i+1}. <b>{msg}</b>" for i, msg in enumerate(truncated_messages)])
     additional_message = (
         "⚡️ 𝑨𝒍𝒍 𝒕𝒉𝒆 𝒓𝒆𝒔𝒖𝒍𝒕𝒔 𝒂𝒃𝒐𝒗𝒆 𝒄𝒐𝒎𝒆 𝒇𝒓𝒐𝒎 𝒘𝒉𝒂𝒕 𝒖𝒔𝒆𝒓𝒔 𝒉𝒂𝒗𝒆 𝒔𝒆𝒂𝒓𝒄𝒉𝒆𝒅 𝒇𝒐𝒓. "
@@ -971,7 +969,7 @@ async def set_pm_search(client, message):
     try:
         await db.update_pm_search_status(bot_id, enable_status)
         response_text = (
-            "<b> ᴘᴍ ꜱᴇᴀʀᴄʜ ᴇɴᴀʙʟᴇᴅ ✅</b>" if enable_status 
+            "<b> ᴘᴍ ꜱᴇᴀʀᴄʜ ᴇɴᴀʙʟᴇᴅ ✅</b>" if enable_status
             else "<b> ᴘᴍ ꜱᴇᴀʀᴄʜ ᴅɪꜱᴀʙʟᴇᴅ ❌</b>"
         )
         await message.reply_text(response_text)
@@ -991,7 +989,7 @@ async def set_movie_update_notification(client, message):
     try:
         await db.update_movie_update_status(bot_id, enable_status)
         response_text = (
-            "<b>ᴍᴏᴠɪᴇ ᴜᴘᴅᴀᴛᴇ ɴᴏᴛɪꜰɪᴄᴀᴛɪᴏɴ ᴇɴᴀʙʟᴇᴅ ✅</b>" if enable_status 
+            "<b>ᴍᴏᴠɪᴇ ᴜᴘᴅᴀᴛᴇ ɴᴏᴛɪꜰɪᴄᴀᴛɪᴏɴ ᴇɴᴀʙʟᴇᴅ ✅</b>" if enable_status
             else "<b>ᴍᴏᴠɪᴇ ᴜᴘᴅᴀᴛᴇ ɴᴏᴛɪꜰɪᴄᴀᴛɪᴏɴ ᴅɪꜱᴀʙʟᴇᴅ ❌</b>"
         )
         await message.reply_text(response_text)
@@ -1001,7 +999,7 @@ async def set_movie_update_notification(client, message):
 
 @Client.on_message(filters.command("restart") & filters.user(ADMINS))
 async def stop_button(bot, message):
-    msg = await bot.send_message(text="<b><i>ʙᴏᴛ ɪꜱ ʀᴇꜱᴛᴀʀᴛɪɴɢ</i></b>", chat_id=message.chat.id)       
+    msg = await bot.send_message(text="<b><i>ʙᴏᴛ ɪꜱ ʀᴇꜱᴛᴀʀᴛɪɴɢ</i></b>", chat_id=message.chat.id)
     await asyncio.sleep(3)
     await msg.edit("<b><i><u>ʙᴏᴛ ɪꜱ ʀᴇꜱᴛᴀʀᴛᴇᴅ</u> ✅</i></b>")
     os.execl(sys.executable, sys.executable, *sys.argv)
@@ -1024,12 +1022,12 @@ async def del_msg(client, message):
 
 @Client.on_callback_query(filters.regex('^confirm_del_'))
 async def confirmation_handler(client, callback_query):
-    action = callback_query.data.split("_")[-1] 
+    action = callback_query.data.split("_")[-1]
     if action == "yes":
-        await db.delete_all_msg()  
+        await db.delete_all_msg()
         await callback_query.message.edit_text('🧹 ᴜᴘᴅᴀᴛᴇꜱ ᴄʜᴀɴɴᴇʟ ʟɪsᴛ ʜᴀs ʙᴇᴇɴ ᴄʟᴇᴀʀᴇᴅ sᴜᴄᴄᴇssғᴜʟʟʏ ✅')
     elif action == "no":
-        await callback_query.message.delete()  
+        await callback_query.message.delete()
     await callback_query.answer()
 
 @Client.on_message(filters.command('set_caption'))
